@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from langchain.llms import GooglePalm
+from langchain.chat_models import ChatOpenAI
 from langchain_experimental.sql import SQLDatabaseChain
 from langchain.utilities import SQLDatabase
 from langchain.agents import create_sql_agent
@@ -15,49 +16,49 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()  # This line brings all environment variables from .env into os.environ
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY");
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY");
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN");
 BOT_USERNAME = os.environ.get("BOT_USERNAME");
-db_path = "sqlite:///GereNkapDB.db";
 
-
-# Connect to database
-connection = sqlite3.connect("GereNkapDB.db");
-cursor = connection.cursor();
-
-# Create a table to store user's information
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS user_preferences (
-        user_id INTEGER PRIMARY KEY,
-        language TEXT
-    )
-''')
-
-# Create a table to store user's information
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS expenses (
-        user_id INTEGER PRIMARY KEY
-    )
-''')
-
-# Create a table to store user's information
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS debts (
-        user_id INTEGER PRIMARY KEY
-    )
-''')
-
-# Create a table to store user's information
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS budget (
-        user_id INTEGER PRIMARY KEY
-    )
-''')
-
-connection.commit();
 
 
 # Function to get and set the language preference of the user
 def get_set_language_choice(user_id, language=None):
+    # Connect to database
+    connection = sqlite3.connect(f"user_{user_id}.db");
+    cursor = connection.cursor();
+
+    # Create a table to store user's information
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_preferences (
+            user_id INTEGER PRIMARY KEY,
+            language TEXT
+        )
+    ''')
+
+    # Create a table to store user's information
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+            user_id INTEGER PRIMARY KEY
+        )
+    ''')
+
+    # Create a table to store user's information
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS debts (
+            user_id INTEGER PRIMARY KEY
+        )
+    ''')
+
+    # Create a table to store user's information
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budget (
+            user_id INTEGER PRIMARY KEY
+        )
+    ''')
+
+    connection.commit();
+
     if language is not None:
         # Update or insert the language preference
         cursor.execute(
@@ -117,14 +118,30 @@ async def handle_response(text: str, language: str, user_id) -> str:
         return None;
 
     # reading database
+    db_path = f"sqlite:///user_{user_id}.db";
     db = SQLDatabase.from_uri(db_path);
-    llm = GooglePalm(google_api_key=GOOGLE_API_KEY);
+    # llm = GooglePalm(google_api_key=GOOGLE_API_KEY);
+    prefix_template = """You are an agent designed to interact with a SQL database.
+
+        You can give financial advices.
+
+        Your name is GereNkap, and you were created by monkeyK1n9.
+
+        Check their schemas to understand their structure according to tables in database.
+
+        You CAN make any DML statements (INSERT, UPDATE, DELETE, DROP etc.) to the database.
+
+        If the question does not seem related to the database, do not run it, respond: I don't know.
+    """
+
+    llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.7, verbose=True)
     db_chain = SQLDatabaseChain.from_llm(llm, db, verbose=True)
 
     agent_executor = create_sql_agent(
         llm=llm,
         toolkit=SQLDatabaseToolkit(db=db, llm=llm),
         verbose=True,
+        prefix=prefix_template,
         agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     )
 
@@ -134,10 +151,8 @@ async def handle_response(text: str, language: str, user_id) -> str:
 
         return result;
     else:
-        result = agent_executor.run(f"Execute for user_id {user_id}: {text}")
+        result = agent_executor.run(f"Execute pour l'utilisateur {user_id}: {text}. Réponds en Français")
         print(result)
-
-        return result;
 
         return result;
 
