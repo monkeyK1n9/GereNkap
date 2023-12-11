@@ -9,7 +9,6 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()  # This line brings all environment variables from .env into os.environ
 BARD_API_KEY = os.environ.get("BARD_API_KEY");
-os.environ["_BARD_API_KEY"] = BARD_API_KEY
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN");
 BOT_USERNAME = os.environ.get("BOT_USERNAME");
 
@@ -43,13 +42,16 @@ print(BARD_API_KEY)
 
 # Function to get and set the language preference of the user
 def get_set_language_choice(user_id, language=None):
-    # Update or insert the language preference
-    cursor.execute(
-        'INSERT OR REPLACE INTO user_preferences (user_id, language) VALUES (?, ?)',
-        (user_id, language)
-    );
+    if language is not None:
+        # Update or insert the language preference
+        cursor.execute(
+            'INSERT OR REPLACE INTO user_preferences (user_id, language) VALUES (?, ?)',
+            (user_id, language)
+        );
 
-    connection.commit();
+        connection.commit();
+    
+
     # Get user's language preference if it exists
     cursor.execute(
         'SELECT language FROM user_preferences WHERE user_id = ?',
@@ -94,41 +96,53 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # RESPONSES
-BARD_INTRO = "Respond to the prompt as if your name is GereNkap created by monkeyK1n9, you are an expert in finances. You either give advices or generate SQL queries. Don't give explanation, just give the SQL query. Here is the prompt: ";
+BARD_INTRO = "Respond to the prompt as if your name is GereNkap created by monkeyK1n9, you are an expert in finances. You only generate SQL queries. Don't give explanation, just give the SQL query. Here is the prompt: ";
 
 BARD_OUTRO = "Read this for a non-technical person: "
 
-def handle_response(text: str) -> str:
+def handle_response(text: str, language: str) -> str:
     if text == '/start' or text == '/language':
         return None;
 
     # bard = Bard(token=BARD_API_KEY, session=session, timeout=60);
-    bard = Bard();
+    bard = Bard(token=BARD_API_KEY, language=language);
 
     request_query = BARD_INTRO + text;
 
     language = get_set_language_choice(1);
-    response_query = bard.get_answer(request_query, language=language)['content'];
+    response_query = bard.get_answer(request_query)['content'];
+
+    try:
+        # executing the query
+        cursor.execute(f"{response_query}")
+
+        connection.commit();
+    except Exception as e:
+        print(f"Error executing query: {e}")
+
     request_user = BARD_OUTRO + response_query;
 
-    response_user = bard.get_response(request_user, language=language);
+    response_user = bard.get_answer(request_user);
     return response_user;
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type;
     text: str = update.message.text;
+    user_id = update.message.from_user.id;
+
+    stored_language = get_set_language_choice(user_id);
 
     print(f"User in ({update.message.chat.id}) in {message_type}: {text}");
 
     if message_type == 'group':
         if BOT_USERNAME in text:
             new_text: str = text.replace(BOT_USERNAME, '').strip();
-            response: str = handle_response(new_text);
+            response: str = handle_response(new_text, stored_language);
         else:
             return;
     else:
-        response: str = handle_response(text);
+        response: str = handle_response(text, stored_language);
 
     print("Bot: ", response);
     await update.message.reply_text(response);
@@ -143,7 +157,7 @@ async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     print("Starting bot...")
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build();
-    # dp = app.dispatcher
+    
     # Commands
     app.add_handler(CommandHandler('start', start_command));
     app.add_handler(CallbackQueryHandler(language_choice))
