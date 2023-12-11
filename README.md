@@ -8,7 +8,6 @@ GereNkap is a Telegram bot designed to help you manage your finances. It allows 
   - [Features:](#features)
   - [Getting Started:](#getting-started)
     - [Preview](#preview)
-  - [|Discussion|](#discussion)
     - [Install the bot:](#install-the-bot)
     - [Commands:](#commands)
   - [Development](#development)
@@ -29,8 +28,8 @@ Secure: All communication with the bot is encrypted to ensure your data is safe.
 ## Getting Started:
 ### Preview
 |Discussion|
------------
-|[Discussion](./docs/gerenkaptemplate.png)|
+|----------|
+|![Discussion](./docs/gerenkaptemplate.png)|
 
 ### Install the bot:
 Open Telegram and search for "GereNkap".
@@ -42,7 +41,7 @@ Use natural language to describe your expenses, such as "Store this: today I spe
 The bot will save your expense and provide you with a confirmation message.
 ### Commands:
 
-**/start**: Starts the bot and asks you to select your preferred language.
+**/start**: Starts the bot and asks you to select your preferred language.<br>
 **/language**: Allows you to change your language preference.
 Natural Language Interaction:
 
