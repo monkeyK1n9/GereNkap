@@ -1,16 +1,24 @@
 import os
-import requests
 from dotenv import load_dotenv
-from bardapi import Bard
+from langchain.llms import GooglePalm
+from langchain_experimental.sql import SQLDatabaseChain
+from langchain.utilities import SQLDatabase
+from langchain.agents import create_sql_agent
+from langchain.agents.agent_toolkits import SQLDatabaseToolkit
+
+# from langchain.agents import AgentExecutor
+from langchain.agents.agent_types import AgentType
 import sqlite3
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, CallbackContext
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()  # This line brings all environment variables from .env into os.environ
-BARD_API_KEY = os.environ.get("BARD_API_KEY");
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY");
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN");
 BOT_USERNAME = os.environ.get("BOT_USERNAME");
+db_path = "sqlite:///GereNkapDB.db";
+
 
 # Connect to database
 connection = sqlite3.connect("GereNkapDB.db");
@@ -26,19 +34,6 @@ cursor.execute('''
 
 connection.commit();
 
-
-session = requests.Session()
-session.headers = {
-            "Host": "bard.google.com",
-            "X-Same-Domain": "1",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-            "Origin": "https://bard.google.com",
-            "Referer": "https://bard.google.com/",
-        }
-session.cookies.set("__Secure-1PSID", BARD_API_KEY) 
-
-print(BARD_API_KEY)
 
 # Function to get and set the language preference of the user
 def get_set_language_choice(user_id, language=None):
@@ -80,9 +75,9 @@ async def language_choice(update: Update, context: CallbackContext) -> None:
 
     # Handle the chosen language (you can save it, use it, etc.)
     if stored_language == "English":
-        await update.callback_query.message.edit_text(f"You selected: {chosen_language} \n\nGive me you prompt, what do you want to save or a debt or budget?\n\nExample: Today I spent 2000FCFA on transport.__");
+        await update.callback_query.message.edit_text(f"You selected: {chosen_language} \n\nGive me you prompt, what do you want to save or a debt or budget?\n\nExample: Store this: today I spent 2000FCFA on transport.");
     elif stored_language == "Français":
-        await update.callback_query.message.edit_text(f"Vous avez choisi le: {chosen_language} \n\nDonnez-moi une idée de ce que vous voulez économiser ou une dette ou un budget.\n\nExemple : Aujourd'hui, j'ai dépensé 2000FCFA pour le transport.")
+        await update.callback_query.message.edit_text(f"Vous avez choisi le: {chosen_language} \n\nDonnez-moi une idée de ce que vous voulez économiser ou une dette ou un budget.\n\nExemple : Enregistre ceci: aujourd'hui, j'ai dépensé 2000FCFA pour le transport.")
 
 
 
@@ -95,35 +90,35 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Select your preferred language: \n\nSélectionnez votre langue préférée :", reply_markup=get_language_keyboard());
 
 
-# RESPONSES
-BARD_INTRO = "Respond to the prompt as if your name is GereNkap created by monkeyK1n9, you are an expert in finances. You only generate SQL queries. Don't give explanation, just give the SQL query. Here is the prompt: ";
 
-BARD_OUTRO = "Read this for a non-technical person: "
-
-def handle_response(text: str, language: str) -> str:
+async def handle_response(text: str, language: str) -> str:
     if text == '/start' or text == '/language':
         return None;
 
-    # bard = Bard(token=BARD_API_KEY, session=session, timeout=60);
-    bard = Bard(token=BARD_API_KEY, language=language);
+    # reading database
+    db = SQLDatabase.from_uri(db_path);
+    llm = GooglePalm(google_api_key=GOOGLE_API_KEY);
+    db_chain = SQLDatabaseChain.from_llm(llm, db, verbose=True)
 
-    request_query = BARD_INTRO + text;
+    agent_executor = create_sql_agent(
+        llm=llm,
+        toolkit=SQLDatabaseToolkit(db=db, llm=llm),
+        verbose=True,
+        agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    )
 
-    language = get_set_language_choice(1);
-    response_query = bard.get_answer(request_query)['content'];
+    if language == "English":
+        result = agent_executor.run(f"Respond in English to this: {text}")
+        print(result)
 
-    try:
-        # executing the query
-        cursor.execute(f"{response_query}")
+        return result;
+    else:
+        result = agent_executor.run(f"Respond in french to this: {text}")
+        print(result)
 
-        connection.commit();
-    except Exception as e:
-        print(f"Error executing query: {e}")
+        return result;
 
-    request_user = BARD_OUTRO + response_query;
-
-    response_user = bard.get_answer(request_user);
-    return response_user;
+        return result;
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -138,11 +133,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_type == 'group':
         if BOT_USERNAME in text:
             new_text: str = text.replace(BOT_USERNAME, '').strip();
-            response: str = handle_response(new_text, stored_language);
+            response: str = await handle_response(new_text, stored_language);
         else:
             return;
     else:
-        response: str = handle_response(text, stored_language);
+        response: str = await handle_response(text, stored_language);
 
     print("Bot: ", response);
     await update.message.reply_text(response);
