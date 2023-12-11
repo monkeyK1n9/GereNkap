@@ -91,7 +91,7 @@ async def language_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-async def handle_response(text: str, language: str) -> str:
+async def handle_response(text: str, language: str, user_id) -> str:
     if text == '/start' or text == '/language':
         return None;
 
@@ -108,12 +108,12 @@ async def handle_response(text: str, language: str) -> str:
     )
 
     if language == "English":
-        result = agent_executor.run(f"Respond in English to this: {text}")
+        result = agent_executor.run(f"Execute for user_id {user_id} by respond to this in English: {text}")
         print(result)
 
         return result;
     else:
-        result = agent_executor.run(f"Respond in french to this: {text}")
+        result = agent_executor.run(f"Execute for user_id {user_id} by respond to this in French: {text}")
         print(result)
 
         return result;
@@ -133,11 +133,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_type == 'group':
         if BOT_USERNAME in text:
             new_text: str = text.replace(BOT_USERNAME, '').strip();
-            response: str = await handle_response(new_text, stored_language);
+            response: str = await handle_response(new_text, stored_language, user_id);
         else:
             return;
     else:
-        response: str = await handle_response(text, stored_language);
+        response: str = await handle_response(text, stored_language, user_id);
 
     print("Bot: ", response);
     await update.message.reply_text(response);
