@@ -32,6 +32,27 @@ cursor.execute('''
     )
 ''')
 
+# Create a table to store user's information
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS expenses (
+        user_id INTEGER PRIMARY KEY
+    )
+''')
+
+# Create a table to store user's information
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS debts (
+        user_id INTEGER PRIMARY KEY
+    )
+''')
+
+# Create a table to store user's information
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS budget (
+        user_id INTEGER PRIMARY KEY
+    )
+''')
+
 connection.commit();
 
 
@@ -108,12 +129,12 @@ async def handle_response(text: str, language: str, user_id) -> str:
     )
 
     if language == "English":
-        result = agent_executor.run(f"Execute for user_id {user_id} by respond to this in English: {text}")
+        result = agent_executor.run(f"Execute for user_id {user_id}: {text}")
         print(result)
 
         return result;
     else:
-        result = agent_executor.run(f"Execute for user_id {user_id} by respond to this in French: {text}")
+        result = agent_executor.run(f"Execute for user_id {user_id}: {text}")
         print(result)
 
         return result;
