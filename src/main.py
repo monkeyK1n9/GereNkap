@@ -39,21 +39,30 @@ def get_set_language_choice(user_id, language=None):
     # Create a table to store user's information
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS expenses (
-            user_id INTEGER PRIMARY KEY
+            user_id INTEGER PRIMARY KEY,
+            expense_amount INTEGER, 
+            expense_purpose VARCHAR(255), 
+            expense_date DATE
         )
     ''')
 
     # Create a table to store user's information
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS debts (
-            user_id INTEGER PRIMARY KEY
+            user_id INTEGER PRIMARY KEY,
+            debt_amount INTEGER, 
+            debt_purpose VARCHAR(255), 
+            debt_date DATE
         )
     ''')
 
     # Create a table to store user's information
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS budget (
-            user_id INTEGER PRIMARY KEY
+            user_id INTEGER PRIMARY KEY,
+            budget_amount INTEGER, 
+            budget_purpose VARCHAR(255), 
+            budget_date DATE
         )
     ''')
 
@@ -134,7 +143,7 @@ async def handle_response(text: str, language: str, user_id) -> str:
         If the question does not seem related to the database, do not run it, respond: I don't know.
     """
 
-    llm = ChatOpenAI(model_name="gpt-4", openai_api_key=OPENAI_API_KEY, temperature=0.7, verbose=True)
+    llm = ChatOpenAI(model_name="gpt-4-1106-preview", openai_api_key=OPENAI_API_KEY, temperature=0.7, verbose=True)
     db_chain = SQLDatabaseChain.from_llm(llm, db, verbose=True)
 
     agent_executor = create_sql_agent(
